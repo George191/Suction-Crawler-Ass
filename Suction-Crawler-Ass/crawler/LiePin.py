@@ -45,8 +45,9 @@ class CompanyInfo:
 
     def analysis_company(self, place, url):
         while self.TotalCount:
-            self.logger.info(f'Getting information: {place} {self.PageCount} page  / total {self.TotalCount} pages')
+            self.logger.info(f'Getting information: {place} {self.PageCount} page  / Surplus {self.TotalCount} pages')
             response = requests.get(url + 'pn' + str(self.PageCount), params=self.proxies())
+            self.logger.info(f'The Current Status Code: {self.response.status_code}')
             soup = BeautifulSoup(response.text)
             company_item = soup.find_all(name='div', attrs={'class': 'list-item'})
             for company in company_item:

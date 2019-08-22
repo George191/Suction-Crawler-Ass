@@ -1,6 +1,8 @@
 Spider.config:
     LiePinUrl: 'https://www.liepin.com/company/'
     QiChaChaUrl: 'https://www.qichacha.com/'
+    Mysql.conn:
+    MongoDB.conn:
     User-Agent:
         IP: [
             "119.99.251.159:53281",

@@ -7,7 +7,6 @@ class QiChaCha(CompanyInfo):
         super(QiChaCha, self).__init__()
 
         self.analysis_html()
-        print(self.result)
 
 
 demo = QiChaCha()
