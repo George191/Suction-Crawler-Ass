@@ -1,10 +1,13 @@
-import requests
 from bs4 import BeautifulSoup
-from config.proxy import Proxy
+from tools.proxy import Proxy
 import warnings
 import random
 import logging
 import time
+import os
+import urllib3
+import pandas as pd
+
 warnings.filterwarnings("ignore")
 
 
@@ -19,11 +22,12 @@ class CompanyInfo:
         self.logger.setLevel(logging.INFO)
         self.config = Proxy()
         self.url = self.config.proxies(key='LiePinUrl')
-        self.response = requests.get(self.url, params=self.proxies())
-        self.logger.info(f'The Current Status Code: {self.response.status_code}')
-        self.soup = BeautifulSoup(self.response.text)
-        self.result = dict()
-        self.PageCount = 0
+        self.response = urllib3.PoolManager().request('GET', self.url, headers=self.proxies())
+        self.logger.info(f'The Current Status Code: {self.response.status}')
+        assert self.response.status == 200
+        self.soup = BeautifulSoup(self.response.data.decode('utf-8'))
+        self.company = dict()
+        self.result = list()
         self.TotalCount = 100
 
     def proxies(self):
@@ -35,28 +39,34 @@ class CompanyInfo:
         self.logger.info(f'The Current Header Params: {user_agent}')
         return user_agent
 
-    def analysis_html(self):
+    def analysis_city(self):
         city = self.soup.find(name='div', attrs={'class': 'place-name'}).find_all(name='a')
-
-        city = {element.text: element.get('href') for element in city[:-2]}
+        city = {element.text: element.get('href') for element in city[:-1]}
         for place, url in city.items():
             self.logger.info(f'The city currently being acquired: {place}')
             self.analysis_company(place, url)
+        self.save_company()
 
-    def analysis_company(self, place, url):
-        while self.TotalCount:
-            self.logger.info(f'Getting information: {place} {self.PageCount} page  / Surplus {self.TotalCount} pages')
-            response = requests.get(url + 'pn' + str(self.PageCount), params=self.proxies())
-            self.logger.info(f'The Current Status Code: {self.response.status_code}')
-            soup = BeautifulSoup(response.text)
+    def analysis_company(self, place: str, url: str):
+        for self.PageCount in range(self.TotalCount):
+            self.logger.info(f'Getting information: {place} {self.PageCount + 1} page/Surplus {self.TotalCount} pages')
+            response = urllib3.PoolManager().request('GET', url + 'pn' + str(self.PageCount), headers=self.proxies())
+            self.logger.info(f'The Current Status Code: {response.status}')
+            assert self.response.status == 200
+            soup = BeautifulSoup(response.data.decode('utf-8'))
             company_item = soup.find_all(name='div', attrs={'class': 'list-item'})
             for company in company_item:
-                self.result['city'] = place
-                self.result['company_name'] = company.find('a').get('title')
+                self.company['city'] = place
+                self.company['company_name'] = company.find('a').get('title')
                 company_welfare = company.find(name='p', attrs={'class': 'boon-box'}).find_all('span')
-                self.result['company_welfare'] = [welfare.text for welfare in company_welfare]
-                self.result['company_industry'] = company.find(name='span', attrs={'class': 'industry'}).get('title')
+                self.company['company_welfare'] = ','.join([welfare.text for welfare in company_welfare])
+                self.company['company_industry'] = company.find(name='span', attrs={'class': 'industry'}).get('title')
+                self.result.append(self.company)
 
-            self.PageCount += 1
-            self.TotalCount -= 1
             time.sleep(random.randint(0, 5))
+
+    def save_company(self, path=None):
+        if not path:
+            path = os.path.join(os.path.abspath(os.path.dirname(os.getcwd())), self.config.proxies('LiePinData'))
+        result = pd.DataFrame(self.result)
+        result.to_csv(path, header=None, index=None, encoding='utf-8')
